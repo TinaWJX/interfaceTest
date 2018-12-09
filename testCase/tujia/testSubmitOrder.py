@@ -1,0 +1,157 @@
+import unittest
+import paramunittest
+import readConfig as readConfig
+from common import Log as Log
+from common import common
+from common import configHttp as ConfigHttp
+
+house_xls = common.get_xls("houseCase.xlsx", "tujia_submitOrder")
+localReadConfig = readConfig.ReadConfig()
+configHttp = ConfigHttp.ConfigHttp()
+info = {}
+
+
+@paramunittest.parametrized(*house_xls)
+class SubmitOrder(unittest.TestCase):
+    def setParameters(self, case_name, method, token, oid, room_id, check_in, check_out, currency, guest_count, total_price, link_man, link_phone, link_email, num_of_units, result, code, msg):
+        """
+        set params
+        :param case_name:
+        :param method:
+        :param token:
+        :param oid:
+        :param room_id:
+        :param check_in:
+        :param check_out:
+        :param currency:
+        :param guest_count:
+        :param total_price:
+        :param link_man:
+        :param link_phone:
+        :param link_email:
+        :param num_of_units:
+        :param result:
+        :param code:
+        :param msg:
+        :return:
+        """
+        self.case_name = str(case_name)
+        self.method = str(method)
+        self.token = str(token)
+        self.oid = str(oid)
+        self.room_id = str(room_id)
+        self.check_in = str(check_in)
+        self.check_out = str(check_out)
+        self.currency = str(currency)
+        self.guest_count = str(guest_count)
+        self.total_price = str(total_price)
+        self.link_man = str(link_man)
+        self.link_phone = str(link_phone)
+        self.link_email = str(link_email)
+        self.num_of_units = str(num_of_units)
+        self.result = str(result)
+        self.code = str(code)
+        self.msg = str(msg)
+        self.return_json = None
+        self.info = None
+
+    def description(self):
+        """
+        test report description
+        :return:
+        """
+        self.case_name
+
+    def setUp(self):
+        """
+
+        :return:
+        """
+        self.log = Log.MyLog.get_log()
+        self.logger = self.log.get_logger()
+        print(self.case_name+"测试开始前准备")
+
+    def testSubmitOrder(self):
+        """
+        test body
+        :return:
+        """
+        # set url
+        self.url = common.get_url_from_xml1('submitOrder')
+        configHttp.set_url(self.url)
+        print("第一步：设置url  "+self.url)
+
+        # get visitor token
+        if self.token == '0':
+            token = localReadConfig.get_headers("token_v")
+            header = {"token": str(token)}
+            configHttp.set_headers(header)
+        elif self.token == '1':
+            pass
+
+        # set headers
+        # header = {"token": str(token)}
+        # configHttp.set_headers(header)
+        print("第二步：设置header(token等)")
+
+        # set params
+        data = {"oid": self.oid, "partner_uid": self.room_id, "partner_pid": self.room_id, \
+                "checkin": self.check_in, "checkout": self.check_out,\
+                "currency": self.currency, "guest_count": self.guest_count,\
+                "total_price": self.total_price, "link_man": self.link_man,\
+                "link_phone": self.link_phone, "link_email": self.link_email,\
+                "number_of_units": self.num_of_units}
+        # data_json = json.dumps(data)
+        configHttp.set_data(data)
+        print("第三步：设置发送请求的参数")
+
+        # test interface
+        self.return_json = configHttp.postWithJson()
+        # common.show_return_msg(self.return_json)
+        method = str(self.return_json.request)[int(str(self.return_json.request).find('['))+1:int(str(self.return_json.request).find(']'))]
+        print("第四步：发送请求\n\t\t请求方法："+method)
+
+        # check result
+        self.checkResult()
+        print("第五步：检查结果")
+
+    def checkResult(self):
+        """
+        check test result
+        :return:
+        """
+        self.info = self.return_json.json()
+        # show return message
+        common.show_return_msg(self.return_json)
+
+        if self.result == '0':
+            # email = common.get_value_from_return_json(self.info, 'member', 'email')
+            self.assertEqual(self.info['result_code'], int(self.code))
+            self.assertEqual(self.info['message'], self.msg)
+            # self.assertEqual(email, self.email)
+
+        if self.result == '1':
+            self.assertEqual(self.info['result_code'], self.code)
+            self.assertEqual(self.info['message'], self.msg)
+
+    def tearDown(self):
+        """
+
+        :return:
+        """
+        info = self.info
+        if info['result_code'] == 0:
+            # get user token
+
+            # price_rb = common.get_value_from_return_json(info, 'prices', 0)
+            p_oid = common.get_group_from_return_json(info, 'partner_oid')
+            tujia_oid = []
+            tujia_oid.append(p_oid)
+            # set user token to config file
+            localReadConfig.set_order("tujia_oid", ','.join(tujia_oid))
+        else:
+            pass
+        self.log.build_case_line(self.case_name, str(self.info['result_code']), self.info['message'])
+        print("测试结束，输出log完结\n\n")
+
+
